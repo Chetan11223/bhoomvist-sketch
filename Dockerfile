@@ -32,4 +32,4 @@ EXPOSE 10000
 
 # Step 9: Start Gunicorn with workers and threads dynamically mapped to $PORT
 # --workers 2 to 4 (based on CPU cores) and --threads 4 to handle concurrent I/O & requests
-CMD [ "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 2 --timeout 120 --access-logfile - --error-logfile - app:app"]
+CMD [ "gunicorn --bind 0.0.0.0:10000 --workers 1 --threads  --timeout 120 --access-logfile - --error-logfile - app:app"]
