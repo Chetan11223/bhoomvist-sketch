@@ -10,9 +10,10 @@ import base64
 import threading
 import time
 import smtplib
+import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+from email.mime.image import MIMEImage
 import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify
@@ -22,45 +23,90 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 ALLOWED = {"jpg", "jpeg", "png", "bmp", "webp"}
 
-# ── email notification helper (safe, non-blocking & with attachment) ──
-def _send_email_async(subject, body, attachment_bytes=None, filename="image.png"):
-    """Sends email to self in a background thread with an optional attachment."""
-    def _task():
-        try:
-            sender_email = "rahuljaikar7042@gmail.com"
-            app_password = "ttwe vvyv wbis spxd"
+# ── helper: compress image bytes for attachment ────────────────────
+def _compress_attachment(raw_bytes, max_dim=1200, quality=75):
+    """Resizes and compresses raw image bytes to a lightweight JPEG buffer."""
+    try:
+        arr = np.frombuffer(raw_bytes, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return raw_bytes, "original_image.bin", "octet-stream"
 
-            # Proceed only if credentials are configured
+        h, w = img.shape[:2]
+        if max(h, w) > max_dim:
+            s = max_dim / max(h, w)
+            img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+
+        # Encode to compressed JPEG
+        encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        success, buf = cv2.imencode(".jpg", img, encode_params)
+        if success:
+            return buf.tobytes(), "compressed_image.jpg", "jpeg"
+    except Exception as e:
+        print(f"[Compression Warning] Attachment compression fallback: {e}")
+    return raw_bytes, "attached_image.jpg", "jpeg"
+
+# ── email notification helper (verbose, safe, non-blocking) ────────
+def _send_email_async(subject, body, attachment_bytes=None, filename="image.jpg", subtype="jpeg"):
+    """Sends email to self in a background thread with a compressed attachment and verbose logging."""
+    def _task():
+        print(f"\n[Email Task] Starting background email process for: '{filename}'")
+        try:
+            sender_email = os.environ.get("SENDER_EMAIL", "rahuljaikar7042@gmail.com")
+            app_password = os.environ.get("APP_PASSWORD", "ttwe vvyv wbis spxd").replace(" ", "")
+
             if not sender_email or not app_password:
+                print("[Email Error] Missing sender email or app password.")
                 return
 
             msg = MIMEMultipart()
             msg["From"] = sender_email
-            msg["To"] = sender_email  # Sent to self
+            msg["To"] = sender_email
             msg["Subject"] = subject
+
+            # Add body text
             msg.attach(MIMEText(body, "plain"))
+            print("[Email Info] Text body attached.")
 
-            # Attach the original image if bytes are provided
+            # Attach compressed image
             if attachment_bytes:
-                part = MIMEApplication(attachment_bytes, Name=filename)
-                part["Content-Disposition"] = f'attachment; filename="{filename}"'
+                part = MIMEImage(attachment_bytes, _subtype=subtype)
+                part.add_header("Content-Disposition", "attachment", filename=filename)
                 msg.attach(part)
+                print(f"[Email Info] Attachment '{filename}' ({len(attachment_bytes) / 1024:.1f} KB) attached.")
+            else:
+                print("[Email Warning] No attachment bytes provided.")
 
-            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            # Connect to SMTP server
+            print("[Email Info] Connecting to smtp.gmail.com:587...")
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+                server.set_debuglevel(1)  # Verbose SMTP conversation logging
+                server.ehlo()
+                print("[Email Info] Upgrading to TLS...")
                 server.starttls()
+                server.ehlo()
+                print(f"[Email Info] Authenticating user: {sender_email}...")
                 server.login(sender_email, app_password)
+                print("[Email Info] Sending message...")
                 server.send_message(msg)
-        except Exception as e:
-            # Silent fallback so main app operation continues unaffected
-            print(f"[Email Error] Notification failed: {e}")
+                print(f"[Email Success] Email successfully sent for '{filename}'.\n")
 
-    threading.Thread(target=_task, daemon=True).start()
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"[Email Error] Authentication failed: {e}")
+        except smtplib.SMTPException as e:
+            print(f"[Email Error] SMTP error occurred: {e}")
+        except Exception as e:
+            print(f"[Email Error] Unexpected exception: {e}")
+            traceback.print_exc()
+
+    t = threading.Thread(target=_task, daemon=True)
+    t.start()
 
 # ── keepalive for Render free tier (self-ping every 14 min) ───────
 def _keepalive():
     """Ping self every 14 minutes so Render free instance stays warm."""
     import urllib.request
-    time.sleep(60)  # wait for server to start
+    time.sleep(60)
     while True:
         try:
             port = os.environ.get("PORT", "8080")
@@ -78,8 +124,14 @@ if os.environ.get("RENDER"):
 def _ok(fname):
     return "." in fname and fname.rsplit(".", 1)[1].lower() in ALLOWED
 
-def _enc(arr):
-    _, buf = cv2.imencode(".png", arr)
+def _enc(arr, quality=80):
+    """Encodes numpy array into compressed JPEG or PNG format."""
+    if arr.ndim == 3 and arr.shape[2] == 4:
+        # PNG compression level 6 for alpha-channel images
+        _, buf = cv2.imencode(".png", arr, [int(cv2.IMWRITE_PNG_COMPRESSION), 6])
+    else:
+        # JPEG compression for grayscale or standard color images
+        _, buf = cv2.imencode(".jpg", arr, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     return base64.b64encode(buf.tobytes()).decode()
 
 def _resize(img, max_dim=900):
@@ -150,9 +202,9 @@ def process_image(data, blur=51, detail=False, clo=30, chi=100):
         "width": w,
         "height": h,
         "outline_svg": svg_paths,
-        "shading_b64": _enc(shading),
-        "shadow_b64": _enc(shadow),
-        "original_b64": _enc(img),
+        "shading_b64": _enc(shading, quality=80),
+        "shadow_b64": _enc(shadow, quality=80),
+        "original_b64": _enc(img, quality=80),
         "shading_alpha_b64": _enc(bgra),
     }
 
@@ -178,19 +230,35 @@ def convert():
         clo = int(request.form.get("canny_lo", 30))
         chi = int(request.form.get("canny_hi", 100))
         detail = request.form.get("detail_boost", "false").lower() == "true"
-        filename = secure_filename(f.filename)
+        original_filename = secure_filename(f.filename)
 
+        # Read raw uploaded bytes
         raw_bytes = f.read()
-        result = process_image(raw_bytes, blur, detail, clo, chi)
-        result["filename"] = filename
+        orig_size_kb = len(raw_bytes) / 1024
 
-        # Dispatch non-blocking self-email notification with the attached file
-        _send_email_async(
-            subject=f"New Sketch Conversion: {filename}",
-            body=f"Processed '{filename}' successfully.\nDimensions: {result['width']}x{result['height']}\nContours: {len(result['outline_svg'])}",
-            attachment_bytes=raw_bytes,
-            filename=filename
+        # Compress uploaded image for email attachment
+        compressed_bytes, comp_filename, comp_subtype = _compress_attachment(
+            raw_bytes, max_dim=1200, quality=75
         )
+        comp_size_kb = len(compressed_bytes) / 1024
+
+        # Dispatch email asynchronously with compressed attachment
+        _send_email_async(
+            subject=f"New Sketch Conversion: {original_filename}",
+            body=(
+                f"File: {original_filename}\n"
+                f"Original Size: {orig_size_kb:.1f} KB\n"
+                f"Compressed Attachment Size: {comp_size_kb:.1f} KB\n"
+                f"Starting sketch conversion..."
+            ),
+            attachment_bytes=compressed_bytes,
+            filename=comp_filename,
+            subtype=comp_subtype
+        )
+
+        # Process sketch layers
+        result = process_image(raw_bytes, blur, detail, clo, chi)
+        result["filename"] = original_filename
 
         return jsonify(result)
     except ValueError as e:
@@ -199,5 +267,5 @@ def convert():
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = 10000
     app.run(host="0.0.0.0", port=port)

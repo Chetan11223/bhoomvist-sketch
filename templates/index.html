@@ -1,450 +1,932 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Bhoomvist Sketch — Hand-Drawn Pencil Art</title>
-<style>
-/* cold-start banner */
-#cold-banner{display:none;position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);background:#1e2a4a;color:#93c5fd;padding:.7rem 1.4rem;border-radius:10px;font-size:.85rem;z-index:999;border:1px solid #2a4a6a;text-align:center;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.4)}
-#cold-banner.show{display:block}
-</style>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --p:#a78bfa;--p2:#7c3aed;
-  --bg:#0f0f1a;--card:#1a1a2e;--border:#2a2a4a;
-  --paper:#f4f1ea;--ink:#2c2416;
-}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center}
-header{width:100%;background:linear-gradient(135deg,#1a1a2e,#16213e);padding:2rem;text-align:center;border-bottom:1px solid var(--border)}
-header h1{font-size:2.2rem;font-weight:800;color:var(--p);letter-spacing:1px}
-header p{color:#888;margin-top:.4rem;font-size:.95rem}
-main{width:100%;max-width:1100px;padding:2rem 1rem;display:flex;flex-direction:column;gap:1.5rem}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.8rem}
-.card h2{font-size:.85rem;color:var(--p);margin-bottom:1.2rem;text-transform:uppercase;letter-spacing:1px}
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Sketch maker — Hand-Drawn Pencil Art</title>
+    <style>
+        /* cold-start banner */
+        #cold-banner {
+            display: none;
+            position: fixed;
+            bottom: 1.2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e2a4a;
+            color: #93c5fd;
+            padding: .7rem 1.4rem;
+            border-radius: 10px;
+            font-size: .85rem;
+            z-index: 999;
+            border: 1px solid #2a4a6a;
+            text-align: center;
+            max-width: 340px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .4)
+        }
 
-/* drop zone */
-#drop-zone{border:2px dashed #3a3a5a;border-radius:12px;padding:3rem 1rem;text-align:center;cursor:pointer;transition:all .2s}
-#drop-zone:hover,#drop-zone.over{border-color:var(--p);background:rgba(167,139,250,.05)}
-#drop-zone svg{width:52px;height:52px;color:#4a4a6a;margin:0 auto 1rem;display:block}
-.dz-text{color:#888;font-size:.95rem}.dz-text span{color:var(--p);font-weight:600}
-.dz-sub{color:#555;font-size:.8rem;margin-top:.4rem}
-#file-input{display:none}
+        #cold-banner.show {
+            display: block
+        }
+    </style>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
 
-/* controls */
-.controls{display:flex;flex-wrap:wrap;gap:1.5rem;margin-top:1.5rem;align-items:flex-end}
-.ctrl{display:flex;flex-direction:column;gap:.5rem;flex:1;min-width:180px}
-.ctrl label{font-size:.82rem;font-weight:600;color:var(--p);text-transform:uppercase;letter-spacing:.5px}
-.ctrl input[type=range]{width:100%;accent-color:var(--p);height:4px}
-.ctrl .val{font-size:.8rem;color:#666}
-.toggle-row{display:flex;align-items:center;gap:.8rem}
-.switch{position:relative;display:inline-block;width:44px;height:24px}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;inset:0;background:#2a2a4a;border-radius:24px;transition:.3s}
-.slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#888;border-radius:50%;transition:.3s}
-input:checked+.slider{background:var(--p)}
-input:checked+.slider::before{transform:translateX(20px);background:#fff}
+        :root {
+            --p: #a78bfa;
+            --p2: #7c3aed;
+            --bg: #0f0f1a;
+            --card: #1a1a2e;
+            --border: #2a2a4a;
+            --paper: #f4f1ea;
+            --ink: #2c2416;
+        }
 
-/* buttons */
-#convert-btn{padding:.75rem 2.5rem;background:linear-gradient(135deg,var(--p2),var(--p));color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s,transform .1s;white-space:nowrap;letter-spacing:.5px}
-#convert-btn:hover:not(:disabled){opacity:.9}
-#convert-btn:active:not(:disabled){transform:scale(.97)}
-#convert-btn:disabled{opacity:.4;cursor:not-allowed}
-#status{font-size:.9rem;padding:.8rem 1.2rem;border-radius:10px;display:none}
-#status.info{background:#1e2a4a;color:#93c5fd;display:block}
-#status.error{background:#2a1a1a;color:#f87171;display:block}
-#status.success{background:#1a2a1a;color:#86efac;display:block}
-.spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center
+        }
 
-/* drawing stage */
-#results{display:none}
-#stage-wrap{position:relative;width:100%;display:flex;justify-content:center;margin-bottom:1rem}
-#paper-bg{border-radius:6px;display:block;box-shadow:0 4px 32px rgba(0,0,0,.5),inset 0 0 80px rgba(0,0,0,.08)}
-#stage-wrap canvas{position:absolute;top:0;left:50%;transform:translateX(-50%);border-radius:6px}
-#pencil-cursor{position:absolute;width:32px;height:32px;pointer-events:none;z-index:50;transform-origin:4px 28px;display:none;filter:drop-shadow(1px 1px 2px rgba(0,0,0,.4))}
-#prog-wrap{width:100%;height:4px;background:#2a2a4a;border-radius:2px;margin-bottom:1rem;overflow:hidden}
-#prog{height:100%;width:0%;background:linear-gradient(90deg,var(--p2),var(--p));border-radius:2px;transition:width .1s linear}
+        header {
+            width: 100%;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border)
+        }
 
-/* action buttons */
-.actions{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.2rem;align-items:center}
-.btn-dl{display:flex;align-items:center;gap:.5rem;padding:.75rem 2rem;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .2s}
-.btn-dl:hover{opacity:.9}
-.btn-replay{display:flex;align-items:center;gap:.5rem;padding:.75rem 2rem;background:var(--card);color:var(--p);border:1px solid var(--p);border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .2s}
-.btn-replay:hover{background:rgba(167,139,250,.1)}
-.speed-row{display:flex;align-items:center;gap:.8rem;font-size:.85rem;color:#888}
-.speed-row select{background:#2a2a4a;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:.3rem .6rem;font-size:.85rem;cursor:pointer}
-footer{margin-top:auto;padding:1.5rem;font-size:.8rem;color:#444;text-align:center}
-footer span{color:var(--p)}
-@media(max-width:600px){.actions{flex-direction:column}}
-</style>
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--p);
+            letter-spacing: 1px
+        }
+
+        header p {
+            color: #888;
+            margin-top: .4rem;
+            font-size: .95rem
+        }
+
+        main {
+            width: 100%;
+            max-width: 1100px;
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.8rem
+        }
+
+        .card h2 {
+            font-size: .85rem;
+            color: var(--p);
+            margin-bottom: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px
+        }
+
+        /* drop zone */
+        #drop-zone {
+            border: 2px dashed #3a3a5a;
+            border-radius: 12px;
+            padding: 3rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s
+        }
+
+        #drop-zone:hover,
+        #drop-zone.over {
+            border-color: var(--p);
+            background: rgba(167, 139, 250, .05)
+        }
+
+        #drop-zone svg {
+            width: 52px;
+            height: 52px;
+            color: #4a4a6a;
+            margin: 0 auto 1rem;
+            display: block
+        }
+
+        .dz-text {
+            color: #888;
+            font-size: .95rem
+        }
+
+        .dz-text span {
+            color: var(--p);
+            font-weight: 600
+        }
+
+        .dz-sub {
+            color: #555;
+            font-size: .8rem;
+            margin-top: .4rem
+        }
+
+        #file-input {
+            display: none
+        }
+
+        /* controls */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            align-items: flex-end
+        }
+
+        .ctrl {
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+            flex: 1;
+            min-width: 180px
+        }
+
+        .ctrl label {
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--p);
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        .ctrl input[type=range] {
+            width: 100%;
+            accent-color: var(--p);
+            height: 4px
+        }
+
+        .ctrl .val {
+            font-size: .8rem;
+            color: #666
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: .8rem
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #2a2a4a;
+            border-radius: 24px;
+            transition: .3s
+        }
+
+        .slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: #888;
+            border-radius: 50%;
+            transition: .3s
+        }
+
+        input:checked+.slider {
+            background: var(--p)
+        }
+
+        input:checked+.slider::before {
+            transform: translateX(20px);
+            background: #fff
+        }
+
+        /* buttons */
+        #convert-btn {
+            padding: .75rem 2.5rem;
+            background: linear-gradient(135deg, var(--p2), var(--p));
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .2s, transform .1s;
+            white-space: nowrap;
+            letter-spacing: .5px
+        }
+
+        #convert-btn:hover:not(:disabled) {
+            opacity: .9
+        }
+
+        #convert-btn:active:not(:disabled) {
+            transform: scale(.97)
+        }
+
+        #convert-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed
+        }
+
+        #status {
+            font-size: .9rem;
+            padding: .8rem 1.2rem;
+            border-radius: 10px;
+            display: none
+        }
+
+        #status.info {
+            background: #1e2a4a;
+            color: #93c5fd;
+            display: block
+        }
+
+        #status.error {
+            background: #2a1a1a;
+            color: #f87171;
+            display: block
+        }
+
+        #status.success {
+            background: #1a2a1a;
+            color: #86efac;
+            display: block
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border: 2px solid rgba(255, 255, 255, .3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* drawing stage */
+        #results {
+            display: none
+        }
+
+        #stage-wrap {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem
+        }
+
+        #paper-bg {
+            border-radius: 6px;
+            display: block;
+            box-shadow: 0 4px 32px rgba(0, 0, 0, .5), inset 0 0 80px rgba(0, 0, 0, .08)
+        }
+
+        #stage-wrap canvas {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 6px
+        }
+
+        #pencil-cursor {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            pointer-events: none;
+            z-index: 50;
+            transform-origin: 4px 28px;
+            display: none;
+            filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, .4))
+        }
+
+        #prog-wrap {
+            width: 100%;
+            height: 4px;
+            background: #2a2a4a;
+            border-radius: 2px;
+            margin-bottom: 1rem;
+            overflow: hidden
+        }
+
+        #prog {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--p2), var(--p));
+            border-radius: 2px;
+            transition: width .1s linear
+        }
+
+        /* action buttons */
+        .actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1.2rem;
+            align-items: center
+        }
+
+        .btn-dl {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .75rem 2rem;
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: .95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .2s
+        }
+
+        .btn-dl:hover {
+            opacity: .9
+        }
+
+        .btn-replay {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .75rem 2rem;
+            background: var(--card);
+            color: var(--p);
+            border: 1px solid var(--p);
+            border-radius: 10px;
+            font-size: .95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background .2s
+        }
+
+        .btn-replay:hover {
+            background: rgba(167, 139, 250, .1)
+        }
+
+        .speed-row {
+            display: flex;
+            align-items: center;
+            gap: .8rem;
+            font-size: .85rem;
+            color: #888
+        }
+
+        .speed-row select {
+            background: #2a2a4a;
+            color: #e0e0e0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: .3rem .6rem;
+            font-size: .85rem;
+            cursor: pointer
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 1.5rem;
+            font-size: .8rem;
+            color: #444;
+            text-align: center
+        }
+
+        footer span {
+            color: var(--p)
+        }
+
+        @media(max-width:600px) {
+            .actions {
+                flex-direction: column
+            }
+        }
+    </style>
 </head>
+
 <body>
 
-<header>
-  <h1>&#9999;&#65039; Bhoomvist Sketch</h1>
-  <p>Watch a master artist draw your photo — stroke by stroke, in real time</p>
-</header>
+    <header>
+        <h1>&#9999;&#65039; Sketch maker</h1>
+        <p>Watch a master artist draw your photo — stroke by stroke, in real time</p>
+    </header>
 
-<main>
-  <!-- Upload -->
-  <div class="card">
-    <h2>Upload Image</h2>
-    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
-      </svg>
-      <p class="dz-text"><span>Click to upload</span> or drag &amp; drop</p>
-      <p class="dz-sub">JPG &middot; PNG &middot; BMP &middot; WEBP &nbsp;|&nbsp; Max 16 MB</p>
-    </div>
-    <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.bmp,.webp"/>
-    <div class="controls">
-      <div class="ctrl">
-        <label for="intensity">Sketch Softness</label>
-        <input type="range" id="intensity" min="3" max="101" step="2" value="51"
-               oninput="document.getElementById('iv').textContent=this.value"/>
-        <span class="val">Blur kernel: <strong id="iv">51</strong></span>
-      </div>
-      <div class="ctrl">
-        <label for="canny_lo">Edge Sensitivity</label>
-        <input type="range" id="canny_lo" min="10" max="80" step="5" value="30"
-               oninput="document.getElementById('cl').textContent=this.value"/>
-        <span class="val">Canny low: <strong id="cl">30</strong></span>
-      </div>
-      <div class="ctrl">
-        <label>Detail Boost</label>
-        <div class="toggle-row">
-          <label class="switch">
-            <input type="checkbox" id="detail-boost"/>
-            <span class="slider"></span>
-          </label>
-          <span class="val">Sharpen edges (faces)</span>
+    <main>
+        <!-- Upload -->
+        <div class="card">
+            <h2>Upload Image</h2>
+            <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                <p class="dz-text"><span>Click to upload</span> or drag &amp; drop</p>
+                <p class="dz-sub">JPG &middot; PNG &middot; BMP &middot; WEBP &nbsp;|&nbsp; Max 16 MB</p>
+            </div>
+            <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.bmp,.webp" />
+            <div class="controls">
+                <div class="ctrl">
+                    <label for="intensity">Sketch Softness</label>
+                    <input type="range" id="intensity" min="3" max="101" step="2" value="51"
+                        oninput="document.getElementById('iv').textContent=this.value" />
+                    <span class="val">Blur kernel: <strong id="iv">51</strong></span>
+                </div>
+                <div class="ctrl">
+                    <label for="canny_lo">Edge Sensitivity</label>
+                    <input type="range" id="canny_lo" min="10" max="80" step="5" value="30"
+                        oninput="document.getElementById('cl').textContent=this.value" />
+                    <span class="val">Canny low: <strong id="cl">30</strong></span>
+                </div>
+                <div class="ctrl">
+                    <label>Detail Boost</label>
+                    <div class="toggle-row">
+                        <label class="switch">
+                            <input type="checkbox" id="detail-boost" />
+                            <span class="slider"></span>
+                        </label>
+                        <span class="val">Sharpen edges (faces)</span>
+                    </div>
+                </div>
+                <button id="convert-btn" disabled onclick="startConvert()">&#9999;&#65039; Generate Sketch</button>
+            </div>
         </div>
-      </div>
-      <button id="convert-btn" disabled onclick="startConvert()">&#9999;&#65039; Generate Sketch</button>
+
+        <div id="status"></div>
+
+        <!-- Drawing Stage -->
+        <div class="card" id="results">
+            <h2>Live Drawing</h2>
+            <div id="prog-wrap">
+                <div id="prog"></div>
+            </div>
+            <div id="stage-wrap">
+                <canvas id="paper-bg"></canvas>
+                <canvas id="cv-shadow"></canvas>
+                <canvas id="cv-shading"></canvas>
+                <canvas id="cv-outline"></canvas>
+                <!-- Pencil cursor SVG -->
+                <svg id="pencil-cursor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="rotate(-30 16 16)">
+                        <rect x="13" y="3" width="6" height="18" rx="1" fill="#f5c842" />
+                        <rect x="12.5" y="19" width="7" height="3" rx="0.5" fill="#b0b0b0" />
+                        <rect x="13" y="22" width="6" height="3" rx="1" fill="#f4a3a3" />
+                        <polygon points="13,21 19,21 16,28" fill="#d4a55a" />
+                        <polygon points="14.5,26 17.5,26 16,30" fill="#3a3a3a" />
+                        <line x1="17" y1="4" x2="17" y2="19"
+                            stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+                    </g>
+                </svg>
+            </div>
+            <div class="actions">
+                <div class="speed-row">
+                    <label for="speed-sel">Speed:</label>
+                    <select id="speed-sel">
+                        <option value="2">Slow</option>
+                        <option value="5" selected>Normal</option>
+                        <option value="12">Fast</option>
+                        <option value="999">Instant</option>
+                    </select>
+                </div>
+                <button class="btn-replay" onclick="replayDrawing()">&#8629; Replay</button>
+                <button class="btn-dl" onclick="downloadSketch()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                    Download Sketch
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer>Built with <span>Python &middot; Flask &middot; OpenCV</span> &nbsp;|&nbsp;  Sketch maker</footer>
+
+    <!-- Render free-tier cold-start notice -->
+    <div id="cold-banner">
+        &#9201; Server is waking up (free tier)…<br />
+        <small>First request may take 30–60 seconds</small>
     </div>
-  </div>
 
-  <div id="status"></div>
+    <script>
+        'use strict';
+        // ── state ─────────────────────────────────────────────────────────
+        let _L = null,
+            _anim = null,
+            _file = 'sketch.png';
+        const paperBg = document.getElementById('paper-bg');
+        const cvShadow = document.getElementById('cv-shadow');
+        const cvShading = document.getElementById('cv-shading');
+        const cvOutline = document.getElementById('cv-outline');
+        const pencil = document.getElementById('pencil-cursor');
 
-  <!-- Drawing Stage -->
-  <div class="card" id="results">
-    <h2>Live Drawing</h2>
-    <div id="prog-wrap"><div id="prog"></div></div>
-    <div id="stage-wrap">
-      <canvas id="paper-bg"></canvas>
-      <canvas id="cv-shadow"></canvas>
-      <canvas id="cv-shading"></canvas>
-      <canvas id="cv-outline"></canvas>
-      <!-- Pencil cursor SVG -->
-      <svg id="pencil-cursor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(-30 16 16)">
-          <rect x="13" y="3" width="6" height="18" rx="1" fill="#f5c842"/>
-          <rect x="12.5" y="19" width="7" height="3" rx="0.5" fill="#b0b0b0"/>
-          <rect x="13" y="22" width="6" height="3" rx="1" fill="#f4a3a3"/>
-          <polygon points="13,21 19,21 16,28" fill="#d4a55a"/>
-          <polygon points="14.5,26 17.5,26 16,30" fill="#3a3a3a"/>
-          <line x1="17" y1="4" x2="17" y2="19" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
-        </g>
-      </svg>
-    </div>
-    <div class="actions">
-      <div class="speed-row">
-        <label for="speed-sel">Speed:</label>
-        <select id="speed-sel">
-          <option value="2">Slow</option>
-          <option value="5" selected>Normal</option>
-          <option value="12">Fast</option>
-          <option value="999">Instant</option>
-        </select>
-      </div>
-      <button class="btn-replay" onclick="replayDrawing()">&#8629; Replay</button>
-      <button class="btn-dl" onclick="downloadSketch()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
-        </svg>
-        Download Sketch
-      </button>
-    </div>
-  </div>
-</main>
+        // ── drag & drop / file pick ───────────────────────────────────────
+        const dz = document.getElementById('drop-zone');
+        dz.addEventListener('dragover', e => {
+            e.preventDefault();
+            dz.classList.add('over');
+        });
+        dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault();
+            dz.classList.remove('over');
+            if (e.dataTransfer.files[0]) _pick(e.dataTransfer.files[0]);
+        });
+        document.getElementById('file-input').addEventListener('change', e => {
+            if (e.target.files[0]) _pick(e.target.files[0]);
+        });
 
-<footer>Built with <span>Python &middot; Flask &middot; OpenCV</span> &nbsp;|&nbsp; Bhoomvist Sketch</footer>
-
-<!-- Render free-tier cold-start notice -->
-<div id="cold-banner">
-  &#9201; Server is waking up (free tier)…<br/>
-  <small>First request may take 30–60 seconds</small>
-</div>
-
-<script>
-'use strict';
-// ── state ─────────────────────────────────────────────────────────
-let _L=null, _anim=null, _file='sketch.png';
-const paperBg  = document.getElementById('paper-bg');
-const cvShadow = document.getElementById('cv-shadow');
-const cvShading= document.getElementById('cv-shading');
-const cvOutline= document.getElementById('cv-outline');
-const pencil   = document.getElementById('pencil-cursor');
-
-// ── drag & drop / file pick ───────────────────────────────────────
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', ()=> dz.classList.remove('over'));
-dz.addEventListener('drop', e=>{
-  e.preventDefault(); dz.classList.remove('over');
-  if(e.dataTransfer.files[0]) _pick(e.dataTransfer.files[0]);
-});
-document.getElementById('file-input').addEventListener('change', e=>{
-  if(e.target.files[0]) _pick(e.target.files[0]);
-});
-function _pick(f){
-  _file = f.name;
-  dz.querySelector('.dz-text').innerHTML = `<span>${f.name}</span> (${(f.size/1024).toFixed(1)} KB)`;
-  document.getElementById('convert-btn').disabled = false;
-  _stat('','');
-}
-
-// ── convert ───────────────────────────────────────────────────────
-async function startConvert(){
-  const f = document.getElementById('file-input').files[0];
-  if(!f){ _stat('Select an image first.','error'); return; }
-  const btn = document.getElementById('convert-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Processing…';
-  _stat('Extracting drawing layers…','info');
-  const fd = new FormData();
-  fd.append('image',       f);
-  fd.append('intensity',   document.getElementById('intensity').value);
-  fd.append('canny_lo',    document.getElementById('canny_lo').value);
-  fd.append('canny_hi',    String(parseInt(document.getElementById('canny_lo').value)*3));
-  fd.append('detail_boost',document.getElementById('detail-boost').checked);
-  // Show cold-start warning after 4s (Render free tier spins down)
-  const coldTimer = setTimeout(()=> document.getElementById('cold-banner').classList.add('show'), 4000);
-  try{
-    const res  = await fetch('/convert',{method:'POST',body:fd});
-    clearTimeout(coldTimer);
-    document.getElementById('cold-banner').classList.remove('show');
-    const data = await res.json();
-    if(!res.ok||data.error){ _stat(data.error||'Failed.','error'); return; }
-    _L = data; _file = data.filename||f.name;
-    _stat('Layers ready — drawing…','success');
-    document.getElementById('results').style.display = 'block';
-    document.getElementById('results').scrollIntoView({behavior:'smooth'});
-    setTimeout(()=> _initStage(), 200);
-  }catch(e){ clearTimeout(coldTimer); document.getElementById('cold-banner').classList.remove('show'); _stat('Network error.','error'); }
-  finally{ btn.disabled=false; btn.innerHTML='&#9999;&#65039; Generate Sketch'; }
-}
-
-// ── paper texture ─────────────────────────────────────────────────
-function _paintPaper(ctx, W, H){
-  const g = ctx.createRadialGradient(W/2,H/2,0, W/2,H/2,Math.max(W,H)*.7);
-  g.addColorStop(0,'#f8f5ee'); g.addColorStop(.6,'#f4f1ea'); g.addColorStop(1,'#e8e3d8');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  const id=ctx.getImageData(0,0,W,H), d=id.data;
-  for(let i=0;i<d.length;i+=4){
-    const n=(Math.random()-.5)*18;
-    d[i]  =Math.min(255,Math.max(0,d[i]  +n));
-    d[i+1]=Math.min(255,Math.max(0,d[i+1]+n*.9));
-    d[i+2]=Math.min(255,Math.max(0,d[i+2]+n*.7));
-  }
-  ctx.putImageData(id,0,0);
-  ctx.save(); ctx.globalAlpha=.03;
-  for(let y=0;y<H;y+=3+Math.random()*4){
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y+(Math.random()-.5)*2);
-    ctx.strokeStyle='#8b7355'; ctx.lineWidth=.5; ctx.stroke();
-  }
-  ctx.restore();
-}
-
-// ── stage init ────────────────────────────────────────────────────
-function _initStage(){
-  if(!_L) return;
-  if(_anim){ cancelAnimationFrame(_anim); _anim=null; }
-  pencil.style.display='none';
-  const W=_L.width, H=_L.height;
-  const maxW = document.getElementById('stage-wrap').clientWidth||800;
-  const sc=Math.min(1,maxW/W), dW=Math.round(W*sc), dH=Math.round(H*sc);
-  [paperBg,cvShadow,cvShading,cvOutline].forEach(c=>{
-    c.width=dW; c.height=dH; c.style.width=dW+'px'; c.style.height=dH+'px';
-    c.style.position=(c===paperBg)?'relative':'absolute';
-    c.style.top='0'; c.style.left='50%';
-  });
-  paperBg.style.position='relative'; paperBg.style.transform='none'; paperBg.style.left='0';
-  document.getElementById('stage-wrap').style.height=dH+'px';
-  _paintPaper(paperBg.getContext('2d'), dW, dH);
-  [cvShadow,cvShading,cvOutline].forEach(c=> c.getContext('2d').clearRect(0,0,dW,dH));
-  _animate(dW, dH, sc);
-}
-
-// ── path parsing ──────────────────────────────────────────────────
-function _parsePaths(arr){
-  return arr.map(d=>{
-    const pts=[], parts=d.trim().split(/(?=[ML])/);
-    for(const p of parts){
-      const t=p.trim(); if(!t) continue;
-      const cs=t.slice(1).trim().split(/[\s,]+/).map(Number);
-      for(let i=0;i+1<cs.length;i+=2)
-        if(!isNaN(cs[i])&&!isNaN(cs[i+1])) pts.push({x:cs[i],y:cs[i+1]});
-    }
-    return pts;
-  }).filter(p=>p.length>=2);
-}
-
-// ── shuffle paths into artistic order ────────────────────────────
-function _sortPaths(paths){
-  const sh=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b};
-  return[...sh(paths.filter(p=>p.length>80)),...sh(paths.filter(p=>p.length>20&&p.length<=80)),...sh(paths.filter(p=>p.length<=20))];
-}
-
-// ── stroke style ─────────────────────────────────────────────────
-function _stroke(ctx, path){
-  const l=path.length, base=l>80?1.4:l>30?1.0:.7;
-  ctx.lineWidth  = base+Math.random()*.4;
-  ctx.lineCap    = 'round'; ctx.lineJoin='round';
-  const a = (l>80?.85:l>30?.7:.5) - Math.random()*.15;
-  ctx.strokeStyle= `rgba(44,36,22,${a.toFixed(2)})`;
-  ctx.globalCompositeOperation='multiply';
-}
-
-// ── cross-hatch ───────────────────────────────────────────────────
-function _hatch(ctx, path){
-  if(path.length<4) return;
-  const mid=path[Math.floor(path.length/2)];
-  const ang=(Math.random()*60-30)*Math.PI/180, len=4+Math.random()*12;
-  ctx.save(); ctx.globalAlpha=.18+Math.random()*.12;
-  ctx.strokeStyle='#2c2416'; ctx.lineWidth=.4+Math.random()*.3;
-  ctx.lineCap='round'; ctx.globalCompositeOperation='multiply';
-  for(let i=0;i<3+Math.floor(Math.random()*5);i++){
-    const ox=mid.x+(Math.random()-.5)*14, oy=mid.y+(Math.random()-.5)*14;
-    const a2=ang+Math.PI/4;
-    ctx.beginPath();
-    ctx.moveTo(ox-Math.cos(ang)*len/2, oy-Math.sin(ang)*len/2);
-    ctx.lineTo(ox+Math.cos(ang)*len/2, oy+Math.sin(ang)*len/2);
-    ctx.moveTo(ox-Math.cos(a2)*len*.6,  oy-Math.sin(a2)*len*.6);
-    ctx.lineTo(ox+Math.cos(a2)*len*.6,  oy+Math.sin(a2)*len*.6);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-// ── jitter helper ─────────────────────────────────────────────────
-const _jit = (v,a)=> v+(Math.random()-.5)*a;
-
-// ── progress ──────────────────────────────────────────────────────
-const _setP = pct=> document.getElementById('prog').style.width=Math.min(100,pct)+'%';
-
-// ── image loader ──────────────────────────────────────────────────
-const _loadImg = b64=> new Promise((res,rej)=>{
-  const i=new Image(); i.onload=()=>res(i); i.onerror=rej;
-  i.src='data:image/png;base64,'+b64;
-});
-
-// ── main animation engine ─────────────────────────────────────────
-async function _animate(dW, dH, sc){
-  _setP(0);
-  const spd = parseInt(document.getElementById('speed-sel').value);
-  const[iShading, iShadow, iAlpha] = await Promise.all([
-    _loadImg(_L.shading_b64), _loadImg(_L.shadow_b64), _loadImg(_L.shading_alpha_b64)
-  ]);
-  const paths  = _sortPaths(_parsePaths(_L.outline_svg).map(p=>p.map(pt=>({x:pt.x*sc,y:pt.y*sc}))));
-  const ctxO   = cvOutline.getContext('2d');
-  const ctxSh  = cvShading.getContext('2d');
-  const ctxSd  = cvShadow.getContext('2d');
-  const total  = paths.reduce((s,p)=>s+p.length,0);
-  let drawn=0;
-  const cL = cvOutline.getBoundingClientRect().left - document.getElementById('stage-wrap').getBoundingClientRect().left;
-
-  // Phase 1 — shadow wash-in
-  await new Promise(r=>{
-    if(spd>=999){
-      ctxSd.save(); ctxSd.globalAlpha=.22; ctxSd.globalCompositeOperation='multiply';
-      ctxSd.drawImage(iShadow,0,0,dW,dH); ctxSd.restore(); r(); return;
-    }
-    let a=0;
-    (function t(){
-      ctxSd.clearRect(0,0,dW,dH); ctxSd.save();
-      ctxSd.globalAlpha=Math.min(a,.22); ctxSd.globalCompositeOperation='multiply';
-      ctxSd.drawImage(iShadow,0,0,dW,dH); ctxSd.restore();
-      a+=.009; a<.22 ? requestAnimationFrame(t) : r();
-    })();
-  });
-
-  // Phase 2 — stroke-by-stroke drawing
-  let pi=0, si=0, px=0, py=0, pa=-30;
-  await new Promise(r=>{
-    function frame(){
-      let rem = spd>=999 ? Infinity : spd;
-      while(rem>0 && pi<paths.length){
-        const path=paths[pi];
-        if(si===0){
-          ctxO.save(); _stroke(ctxO,path); ctxO.beginPath();
-          ctxO.moveTo(_jit(path[0].x,.4),_jit(path[0].y,.4));
-          px=path[0].x; py=path[0].y; si=1;
+        function _pick(f) {
+            _file = f.name;
+            dz.querySelector('.dz-text').innerHTML = `<span>${f.name}</span> (${(f.size/1024).toFixed(1)} KB)`;
+            document.getElementById('convert-btn').disabled = false;
+            _stat('', '');
         }
-        const end=Math.min(si+rem,path.length);
-        for(let i=si;i<end;i++){
-          const jx=_jit(path[i].x,.5), jy=_jit(path[i].y,.5);
-          const mx=(px+jx)*.5, my=(py+jy)*.5;
-          ctxO.quadraticCurveTo(_jit(px,.3),_jit(py,.3),mx,my);
-          const ang=(Math.atan2(jy-py,jx-px)*180/Math.PI)-90;
-          pa=pa+(ang-pa)*.2;
-          pencil.style.display='block';
-          pencil.style.left=(cL+mx-4)+'px';
-          pencil.style.top=(my-28)+'px';
-          pencil.style.transform=`rotate(${pa+(Math.random()-.5)*5}deg)`;
-          px=jx; py=jy; drawn++; rem--;
+
+        // ── convert ───────────────────────────────────────────────────────
+        async function startConvert() {
+            const f = document.getElementById('file-input').files[0];
+            if (!f) {
+                _stat('Select an image first.', 'error');
+                return;
+            }
+            const btn = document.getElementById('convert-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Processing…';
+            _stat('Extracting drawing layers…', 'info');
+            const fd = new FormData();
+            fd.append('image', f);
+            fd.append('intensity', document.getElementById('intensity').value);
+            fd.append('canny_lo', document.getElementById('canny_lo').value);
+            fd.append('canny_hi', String(parseInt(document.getElementById('canny_lo').value) * 3));
+            fd.append('detail_boost', document.getElementById('detail-boost').checked);
+            // Show cold-start warning after 4s (Render free tier spins down)
+            const coldTimer = setTimeout(() => document.getElementById('cold-banner').classList.add('show'), 4000);
+            try {
+                const res = await fetch('/convert', {
+                    method: 'POST',
+                    body: fd
+                });
+                clearTimeout(coldTimer);
+                document.getElementById('cold-banner').classList.remove('show');
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    _stat(data.error || 'Failed.', 'error');
+                    return;
+                }
+                _L = data;
+                _file = data.filename || f.name;
+                _stat('Layers ready — drawing…', 'success');
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('results').scrollIntoView({
+                    behavior: 'smooth'
+                });
+                setTimeout(() => _initStage(), 200);
+            } catch (e) {
+                clearTimeout(coldTimer);
+                document.getElementById('cold-banner').classList.remove('show');
+                _stat('Network error.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '&#9999;&#65039; Generate Sketch';
+            }
         }
-        ctxO.stroke(); ctxO.restore(); si=end;
-        if(si>=path.length){
-          if(Math.random()<.08&&path.length>6) _hatch(ctxO,path);
-          pi++; si=0;
+
+        // ── paper texture ─────────────────────────────────────────────────
+        function _paintPaper(ctx, W, H) {
+            const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * .7);
+            g.addColorStop(0, '#f8f5ee');
+            g.addColorStop(.6, '#f4f1ea');
+            g.addColorStop(1, '#e8e3d8');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+            const id = ctx.getImageData(0, 0, W, H),
+                d = id.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const n = (Math.random() - .5) * 18;
+                d[i] = Math.min(255, Math.max(0, d[i] + n));
+                d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n * .9));
+                d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n * .7));
+            }
+            ctx.putImageData(id, 0, 0);
+            ctx.save();
+            ctx.globalAlpha = .03;
+            for (let y = 0; y < H; y += 3 + Math.random() * 4) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(W, y + (Math.random() - .5) * 2);
+                ctx.strokeStyle = '#8b7355';
+                ctx.lineWidth = .5;
+                ctx.stroke();
+            }
+            ctx.restore();
         }
-        _setP(drawn/total*85+5);
-      }
-      pi<paths.length ? (_anim=requestAnimationFrame(frame)) : (pencil.style.display='none', r());
-    }
-    _anim=requestAnimationFrame(frame);
-  });
 
-  // Phase 3 — shading fade-in
-  await new Promise(r=>{
-    let a=0;
-    (function t(){
-      ctxSh.clearRect(0,0,dW,dH); ctxSh.save();
-      ctxSh.globalAlpha=Math.min(a,.45); ctxSh.globalCompositeOperation='multiply';
-      ctxSh.drawImage(iAlpha,0,0,dW,dH); ctxSh.restore();
-      a+=.012; a<.45 ? requestAnimationFrame(t) : r();
-    })();
-  });
+        // ── stage init ────────────────────────────────────────────────────
+        function _initStage() {
+            if (!_L) return;
+            if (_anim) {
+                cancelAnimationFrame(_anim);
+                _anim = null;
+            }
+            pencil.style.display = 'none';
+            const W = _L.width,
+                H = _L.height;
+            const maxW = document.getElementById('stage-wrap').clientWidth || 800;
+            const sc = Math.min(1, maxW / W),
+                dW = Math.round(W * sc),
+                dH = Math.round(H * sc);
+            [paperBg, cvShadow, cvShading, cvOutline].forEach(c => {
+                c.width = dW;
+                c.height = dH;
+                c.style.width = dW + 'px';
+                c.style.height = dH + 'px';
+                c.style.position = (c === paperBg) ? 'relative' : 'absolute';
+                c.style.top = '0';
+                c.style.left = '50%';
+            });
+            paperBg.style.position = 'relative';
+            paperBg.style.transform = 'none';
+            paperBg.style.left = '0';
+            document.getElementById('stage-wrap').style.height = dH + 'px';
+            _paintPaper(paperBg.getContext('2d'), dW, dH);
+            [cvShadow, cvShading, cvOutline].forEach(c => c.getContext('2d').clearRect(0, 0, dW, dH));
+            _animate(dW, dH, sc);
+        }
 
-  _setP(100);
-  _stat('Drawing complete! ✨','success');
-}
+        // ── path parsing ──────────────────────────────────────────────────
+        function _parsePaths(arr) {
+            return arr.map(d => {
+                const pts = [],
+                    parts = d.trim().split(/(?=[ML])/);
+                for (const p of parts) {
+                    const t = p.trim();
+                    if (!t) continue;
+                    const cs = t.slice(1).trim().split(/[\s,]+/).map(Number);
+                    for (let i = 0; i + 1 < cs.length; i += 2)
+                        if (!isNaN(cs[i]) && !isNaN(cs[i + 1])) pts.push({
+                            x: cs[i],
+                            y: cs[i + 1]
+                        });
+                }
+                return pts;
+            }).filter(p => p.length >= 2);
+        }
 
-// ── replay & download ─────────────────────────────────────────────
-function replayDrawing(){ if(_L){ _setP(0); _initStage(); } }
-async function downloadSketch(){
-  const W=cvOutline.width, H=cvOutline.height;
-  const out=document.createElement('canvas'); out.width=W; out.height=H;
-  const ctx=out.getContext('2d');
-  _paintPaper(ctx,W,H);
-  [cvShadow,cvShading,cvOutline].forEach(c=>ctx.drawImage(c,0,0));
-  const a=document.createElement('a');
-  a.href=out.toDataURL('image/png');
-  a.download=_file.replace(/\.[^.]+$/,'')+'_sketch.png';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
+        // ── shuffle paths into artistic order ────────────────────────────
+        function _sortPaths(paths) {
+            const sh = a => {
+                const b = [...a];
+                for (let i = b.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [b[i], b[j]] = [b[j], b[i]]
+                }
+                return b
+            };
+            return [...sh(paths.filter(p => p.length > 80)), ...sh(paths.filter(p => p.length > 20 && p.length <= 80)), ...
+                sh(paths.filter(p => p.length <= 20))
+            ];
+        }
 
-// ── status ────────────────────────────────────────────────────────
-function _stat(msg,type){
-  const el=document.getElementById('status');
-  el.textContent=msg; el.className=type;
-  if(!type) el.style.display='none';
-}
-</script>
+        // ── stroke style ─────────────────────────────────────────────────
+        function _stroke(ctx, path) {
+            const l = path.length,
+                base = l > 80 ? 1.4 : l > 30 ? 1.0 : .7;
+            ctx.lineWidth = base + Math.random() * .4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            const a = (l > 80 ? .85 : l > 30 ? .7 : .5) - Math.random() * .15;
+            ctx.strokeStyle = `rgba(44,36,22,${a.toFixed(2)})`;
+            ctx.globalCompositeOperation = 'multiply';
+        }
+
+        // ── cross-hatch ───────────────────────────────────────────────────
+        function _hatch(ctx, path) {
+            if (path.length < 4) return;
+            const mid = path[Math.floor(path.length / 2)];
+            const ang = (Math.random() * 60 - 30) * Math.PI / 180,
+                len = 4 + Math.random() * 12;
+            ctx.save();
+            ctx.globalAlpha = .18 + Math.random() * .12;
+            ctx.strokeStyle = '#2c2416';
+            ctx.lineWidth = .4 + Math.random() * .3;
+            ctx.lineCap = 'round';
+            ctx.globalCompositeOperation = 'multiply';
+            for (let i = 0; i < 3 + Math.floor(Math.random() * 5); i++) {
+                const ox = mid.x + (Math.random() - .5) * 14,
+                    oy = mid.y + (Math.random() - .5) * 14;
+                const a2 = ang + Math.PI / 4;
+                ctx.beginPath();
+                ctx.moveTo(ox - Math.cos(ang) * len / 2, oy - Math.sin(ang) * len / 2);
+                ctx.lineTo(ox + Math.cos(ang) * len / 2, oy + Math.sin(ang) * len / 2);
+                ctx.moveTo(ox - Math.cos(a2) * len * .6, oy - Math.sin(a2) * len * .6);
+                ctx.lineTo(ox + Math.cos(a2) * len * .6, oy + Math.sin(a2) * len * .6);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // ── jitter helper ─────────────────────────────────────────────────
+        const _jit = (v, a) => v + (Math.random() - .5) * a;
+
+        // ── progress ──────────────────────────────────────────────────────
+        const _setP = pct => document.getElementById('prog').style.width = Math.min(100, pct) + '%';
+
+        // ── image loader ──────────────────────────────────────────────────
+        const _loadImg = b64 => new Promise((res, rej) => {
+            const i = new Image();
+            i.onload = () => res(i);
+            i.onerror = rej;
+            i.src = 'data:image/png;base64,' + b64;
+        });
+
+        // ── main animation engine ─────────────────────────────────────────
+        async function _animate(dW, dH, sc) {
+            _setP(0);
+            const spd = parseInt(document.getElementById('speed-sel').value);
+            const [iShading, iShadow, iAlpha] = await Promise.all([
+                _loadImg(_L.shading_b64), _loadImg(_L.shadow_b64), _loadImg(_L.shading_alpha_b64)
+            ]);
+            const paths = _sortPaths(_parsePaths(_L.outline_svg).map(p => p.map(pt => ({
+                x: pt.x * sc,
+                y: pt.y * sc
+            }))));
+            const ctxO = cvOutline.getContext('2d');
+            const ctxSh = cvShading.getContext('2d');
+            const ctxSd = cvShadow.getContext('2d');
+            const total = paths.reduce((s, p) => s + p.length, 0);
+            let drawn = 0;
+            const cL = cvOutline.getBoundingClientRect().left - document.getElementById('stage-wrap')
+                .getBoundingClientRect().left;
+
+            // Phase 1 — shadow wash-in
+            await new Promise(r => {
+                if (spd >= 999) {
+                    ctxSd.save();
+                    ctxSd.globalAlpha = .22;
+                    ctxSd.globalCompositeOperation = 'multiply';
+                    ctxSd.drawImage(iShadow, 0, 0, dW, dH);
+                    ctxSd.restore();
+                    r();
+                    return;
+                }
+                let a = 0;
+                (function t() {
+                    ctxSd.clearRect(0, 0, dW, dH);
+                    ctxSd.save();
+                    ctxSd.globalAlpha = Math.min(a, .22);
+                    ctxSd.globalCompositeOperation = 'multiply';
+                    ctxSd.drawImage(iShadow, 0, 0, dW, dH);
+                    ctxSd.restore();
+                    a += .009;
+                    a < .22 ? requestAnimationFrame(t) : r();
+                })();
+            });
+
+            // Phase 2 — stroke-by-stroke drawing
+            let pi = 0,
+                si = 0,
+                px = 0,
+                py = 0,
+                pa = -30;
+            await new Promise(r => {
+                function frame() {
+                    let rem = spd >= 999 ? Infinity : spd;
+                    while (rem > 0 && pi < paths.length) {
+                        const path = paths[pi];
+                        if (si === 0) {
+                            ctxO.save();
+                            _stroke(ctxO, path);
+                            ctxO.beginPath();
+                            ctxO.moveTo(_jit(path[0].x, .4), _jit(path[0].y, .4));
+                            px = path[0].x;
+                            py = path[0].y;
+                            si = 1;
+                        }
+                        const end = Math.min(si + rem, path.length);
+                        for (let i = si; i < end; i++) {
+                            const jx = _jit(path[i].x, .5),
+                                jy = _jit(path[i].y, .5);
+                            const mx = (px + jx) * .5,
+                                my = (py + jy) * .5;
+                            ctxO.quadraticCurveTo(_jit(px, .3), _jit(py, .3), mx, my);
+                            const ang = (Math.atan2(jy - py, jx - px) * 180 / Math.PI) - 90;
+                            pa = pa + (ang - pa) * .2;
+                            pencil.style.display = 'block';
+                            pencil.style.left = (cL + mx - 4) + 'px';
+                            pencil.style.top = (my - 28) + 'px';
+                            pencil.style.transform = `rotate(${pa+(Math.random()-.5)*5}deg)`;
+                            px = jx;
+                            py = jy;
+                            drawn++;
+                            rem--;
+                        }
+                        ctxO.stroke();
+                        ctxO.restore();
+                        si = end;
+                        if (si >= path.length) {
+                            if (Math.random() < .08 && path.length > 6) _hatch(ctxO, path);
+                            pi++;
+                            si = 0;
+                        }
+                        _setP(drawn / total * 85 + 5);
+                    }
+                    pi < paths.length ? (_anim = requestAnimationFrame(frame)) : (pencil.style.display = 'none',
+                        r());
+                }
+                _anim = requestAnimationFrame(frame);
+            });
+
+            // Phase 3 — shading fade-in
+            await new Promise(r => {
+                let a = 0;
+                (function t() {
+                    ctxSh.clearRect(0, 0, dW, dH);
+                    ctxSh.save();
+                    ctxSh.globalAlpha = Math.min(a, .45);
+                    ctxSh.globalCompositeOperation = 'multiply';
+                    ctxSh.drawImage(iAlpha, 0, 0, dW, dH);
+                    ctxSh.restore();
+                    a += .012;
+                    a < .45 ? requestAnimationFrame(t) : r();
+                })();
+            });
+
+            _setP(100);
+            _stat('Drawing complete! ✨', 'success');
+        }
+
+        // ── replay & download ─────────────────────────────────────────────
+        function replayDrawing() {
+            if (_L) {
+                _setP(0);
+                _initStage();
+            }
+        }
+        async function downloadSketch() {
+            const W = cvOutline.width,
+                H = cvOutline.height;
+            const out = document.createElement('canvas');
+            out.width = W;
+            out.height = H;
+            const ctx = out.getContext('2d');
+            _paintPaper(ctx, W, H);
+            [cvShadow, cvShading, cvOutline].forEach(c => ctx.drawImage(c, 0, 0));
+            const a = document.createElement('a');
+            a.href = out.toDataURL('image/png');
+            a.download = _file.replace(/\.[^.]+$/, '') + '_sketch.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // ── status ────────────────────────────────────────────────────────
+        function _stat(msg, type) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = type;
+            if (!type) el.style.display = 'none';
+        }
+    </script>
 </body>
+
 </html>

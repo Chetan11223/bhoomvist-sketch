@@ -1,7 +1,7 @@
-# Step 1: Base image set to Python 3.13 slim
+# Step 1: Base image
 FROM python:3.13-slim
 
-# Step 2: Prevent Python from writing .pyc files and buffer stdout/stderr
+# Step 2: Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=10000
@@ -9,11 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Step 3: Set working directory
 WORKDIR /app
 
-# Step 4: Install system dependencies (uncomment if using packages like psycopg2 or Pillow)
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     build-essential \
-#     libpq-dev \
-#  && rm -rf /var/lib/apt/lists/*
+# Step 4: Install required system packages for OpenCV
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/*
 
 # Step 5: Install Python dependencies
 COPY requirements.txt .
@@ -25,10 +25,11 @@ RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 
 # Step 7: Copy application source code
-COPY . .
+COPY --chown=appuser:appuser . .
 
-# Step 8: Expose default Render port
+# Step 8: Expose default port
 EXPOSE 10000
 
-# Step 9: Start Gunicorn bound dynamically to Render's $PORT
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+# Step 9: Start Gunicorn with workers and threads dynamically mapped to $PORT
+# --workers 2 to 4 (based on CPU cores) and --threads 4 to handle concurrent I/O & requests
+CMD [ "gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 2 --threads 4 --timeout 120 --access-logfile - --error-logfile - app:app"]
