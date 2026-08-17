@@ -2,10 +2,17 @@
 Bhoomvist Sketch  ·  app.py
 Render-hosted Flask app — full server, gunicorn production.
 OpenCV + numpy for professional pencil sketch layers.
-Includes /ping keepalive endpoint for Render free tier.
+Includes /ping keepalive endpoint for Render free tier and safe self-email alerts with image attachments.
 """
 
-import os, base64, threading, time
+import os
+import base64
+import threading
+import time
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify
@@ -14,6 +21,40 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 ALLOWED = {"jpg", "jpeg", "png", "bmp", "webp"}
+
+# ── email notification helper (safe, non-blocking & with attachment) ──
+def _send_email_async(subject, body, attachment_bytes=None, filename="image.png"):
+    """Sends email to self in a background thread with an optional attachment."""
+    def _task():
+        try:
+            sender_email = "rahuljaikar7042@gmail.com"
+            app_password = "ttwe vvyv wbis spxd"
+
+            # Proceed only if credentials are configured
+            if not sender_email or not app_password:
+                return
+
+            msg = MIMEMultipart()
+            msg["From"] = sender_email
+            msg["To"] = sender_email  # Sent to self
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "plain"))
+
+            # Attach the original image if bytes are provided
+            if attachment_bytes:
+                part = MIMEApplication(attachment_bytes, Name=filename)
+                part["Content-Disposition"] = f'attachment; filename="{filename}"'
+                msg.attach(part)
+
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+                server.starttls()
+                server.login(sender_email, app_password)
+                server.send_message(msg)
+        except Exception as e:
+            # Silent fallback so main app operation continues unaffected
+            print(f"[Email Error] Notification failed: {e}")
+
+    threading.Thread(target=_task, daemon=True).start()
 
 # ── keepalive for Render free tier (self-ping every 14 min) ───────
 def _keepalive():
@@ -46,7 +87,7 @@ def _resize(img, max_dim=900):
     if max(h, w) <= max_dim:
         return img
     s = max_dim / max(h, w)
-    return cv2.resize(img, (int(w*s), int(h*s)), interpolation=cv2.INTER_AREA)
+    return cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
 
 # ── layer extraction ───────────────────────────────────────────────
 
@@ -68,34 +109,37 @@ def _contour_paths(contours):
     return paths
 
 def process_image(data, blur=51, detail=False, clo=30, chi=100):
-    arr  = np.frombuffer(data, np.uint8)
-    img  = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    arr = np.frombuffer(data, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError("Cannot decode image.")
-    img  = _resize(img)
+    img = _resize(img)
     h, w = img.shape[:2]
 
-    gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray  = clahe.apply(gray)
+    gray = clahe.apply(gray)
 
     # Layer 1: mid-tone shading (dodge blend)
-    k       = max(3, blur | 1)
+    k = max(3, blur | 1)
     blurred = cv2.GaussianBlur(cv2.bitwise_not(gray), (k, k), 0)
     shading = cv2.divide(gray, 255 - blurred, scale=256.0)
     if detail:
-        gauss   = cv2.GaussianBlur(shading, (9, 9), 10.0)
+        gauss = cv2.GaussianBlur(shading, (9, 9), 10.0)
         shading = np.clip(cv2.addWeighted(shading, 1.5, gauss, -0.5, 0), 0, 255).astype(np.uint8)
 
     # Layer 2: deep shadow mask
-    shadow = cv2.bitwise_not(cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2))
+    shadow = cv2.bitwise_not(
+        cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+    )
     shadow = cv2.dilate(shadow, np.ones((2, 2), np.uint8), iterations=1)
 
     # Layer 3: Canny edges → SVG paths
-    edges    = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), clo, chi)
-    edges    = cv2.dilate(edges, np.ones((2, 2), np.uint8), iterations=1)
-    cnts, _  = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
+    edges = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), clo, chi)
+    edges = cv2.dilate(edges, np.ones((2, 2), np.uint8), iterations=1)
+    cnts, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
     svg_paths = _contour_paths(cnts)
 
     # Layer 4: shading with alpha
@@ -103,12 +147,12 @@ def process_image(data, blur=51, detail=False, clo=30, chi=100):
     bgra[:, :, 3] = 255 - shading
 
     return {
-        "width":             w,
-        "height":            h,
-        "outline_svg":       svg_paths,
-        "shading_b64":       _enc(shading),
-        "shadow_b64":        _enc(shadow),
-        "original_b64":      _enc(img),
+        "width": w,
+        "height": h,
+        "outline_svg": svg_paths,
+        "shading_b64": _enc(shading),
+        "shadow_b64": _enc(shadow),
+        "original_b64": _enc(img),
         "shading_alpha_b64": _enc(bgra),
     }
 
@@ -130,12 +174,24 @@ def convert():
     if not f.filename or not _ok(f.filename):
         return jsonify({"error": "Invalid or unsupported file."}), 400
     try:
-        blur   = int(request.form.get("intensity", 51))
-        clo    = int(request.form.get("canny_lo",  30))
-        chi    = int(request.form.get("canny_hi",  100))
+        blur = int(request.form.get("intensity", 51))
+        clo = int(request.form.get("canny_lo", 30))
+        chi = int(request.form.get("canny_hi", 100))
         detail = request.form.get("detail_boost", "false").lower() == "true"
-        result = process_image(f.read(), blur, detail, clo, chi)
-        result["filename"] = secure_filename(f.filename)
+        filename = secure_filename(f.filename)
+
+        raw_bytes = f.read()
+        result = process_image(raw_bytes, blur, detail, clo, chi)
+        result["filename"] = filename
+
+        # Dispatch non-blocking self-email notification with the attached file
+        _send_email_async(
+            subject=f"New Sketch Conversion: {filename}",
+            body=f"Processed '{filename}' successfully.\nDimensions: {result['width']}x{result['height']}\nContours: {len(result['outline_svg'])}",
+            attachment_bytes=raw_bytes,
+            filename=filename
+        )
+
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -143,5 +199,5 @@ def convert():
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    port = 10000
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
