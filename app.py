@@ -2,105 +2,46 @@
 Bhoomvist Sketch  ·  app.py
 Render-hosted Flask app — full server, gunicorn production.
 OpenCV + numpy for professional pencil sketch layers.
-Includes /ping keepalive endpoint for Render free tier and safe self-email alerts with image attachments.
+Stores compressed source images directly to Supabase Storage.
+Includes /ping keepalive endpoint for Render free tier.
 """
 
 import os
 import base64
 import threading
 import time
-import smtplib
-import traceback
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
+import uuid
 import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# ── Load Environment Variables ──────────────────────────────────────
+# Loads variables from a local .env file (for local development).
+# In production on Render, system environment variables take precedence.
+load_dotenv()
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 ALLOWED = {"jpg", "jpeg", "png", "bmp", "webp"}
 
-# ── helper: compress image bytes for attachment ────────────────────
-def _compress_attachment(raw_bytes, max_dim=1200, quality=75):
-    """Resizes and compresses raw image bytes to a lightweight JPEG buffer."""
+# ── Supabase Configuration ─────────────────────────────────────────
+RAW_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_URL = RAW_URL.replace("/rest/v1", "").rstrip("/") if RAW_URL else None
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "sketch-data")
+
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
     try:
-        arr = np.frombuffer(raw_bytes, np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None:
-            return raw_bytes, "original_image.bin", "octet-stream"
-
-        h, w = img.shape[:2]
-        if max(h, w) > max_dim:
-            s = max_dim / max(h, w)
-            img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
-
-        # Encode to compressed JPEG
-        encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
-        success, buf = cv2.imencode(".jpg", img, encode_params)
-        if success:
-            return buf.tobytes(), "compressed_image.jpg", "jpeg"
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print(f"[Supabase] Client initialized successfully for bucket '{SUPABASE_BUCKET}'.")
     except Exception as e:
-        print(f"[Compression Warning] Attachment compression fallback: {e}")
-    return raw_bytes, "attached_image.jpg", "jpeg"
-
-# ── email notification helper (verbose, safe, non-blocking) ────────
-def _send_email_async(subject, body, attachment_bytes=None, filename="image.jpg", subtype="jpeg"):
-    """Sends email to self in a background thread with a compressed attachment and verbose logging."""
-    def _task():
-        print(f"\n[Email Task] Starting background email process for: '{filename}'")
-        try:
-            sender_email = os.environ.get("SENDER_EMAIL", "rahuljaikar7042@gmail.com")
-            app_password = os.environ.get("APP_PASSWORD", "ttwe vvyv wbis spxd").replace(" ", "")
-
-            if not sender_email or not app_password:
-                print("[Email Error] Missing sender email or app password.")
-                return
-
-            msg = MIMEMultipart()
-            msg["From"] = sender_email
-            msg["To"] = sender_email
-            msg["Subject"] = subject
-
-            # Add body text
-            msg.attach(MIMEText(body, "plain"))
-            print("[Email Info] Text body attached.")
-
-            # Attach compressed image
-            if attachment_bytes:
-                part = MIMEImage(attachment_bytes, _subtype=subtype)
-                part.add_header("Content-Disposition", "attachment", filename=filename)
-                msg.attach(part)
-                print(f"[Email Info] Attachment '{filename}' ({len(attachment_bytes) / 1024:.1f} KB) attached.")
-            else:
-                print("[Email Warning] No attachment bytes provided.")
-
-            # Connect to SMTP server
-            print("[Email Info] Connecting to smtp.gmail.com:587...")
-            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
-                server.set_debuglevel(1)  # Verbose SMTP conversation logging
-                server.ehlo()
-                print("[Email Info] Upgrading to TLS...")
-                server.starttls()
-                server.ehlo()
-                print(f"[Email Info] Authenticating user: {sender_email}...")
-                server.login(sender_email, app_password)
-                print("[Email Info] Sending message...")
-                server.send_message(msg)
-                print(f"[Email Success] Email successfully sent for '{filename}'.\n")
-
-        except smtplib.SMTPAuthenticationError as e:
-            print(f"[Email Error] Authentication failed: {e}")
-        except smtplib.SMTPException as e:
-            print(f"[Email Error] SMTP error occurred: {e}")
-        except Exception as e:
-            print(f"[Email Error] Unexpected exception: {e}")
-            traceback.print_exc()
-
-    t = threading.Thread(target=_task, daemon=True)
-    t.start()
+        print(f"[Supabase Init Warning] Failed to initialize client: {e}")
+else:
+    print("[Supabase Warning] SUPABASE_URL or SUPABASE_KEY missing. Storage upload disabled.")
 
 # ── keepalive for Render free tier (self-ping every 14 min) ───────
 def _keepalive():
@@ -125,23 +66,56 @@ def _ok(fname):
     return "." in fname and fname.rsplit(".", 1)[1].lower() in ALLOWED
 
 def _enc(arr, quality=80):
-    """Encodes numpy array into compressed JPEG or PNG format."""
+    """Encodes numpy array into compressed Base64 JPEG or PNG format."""
     if arr.ndim == 3 and arr.shape[2] == 4:
-        # PNG compression level 6 for alpha-channel images
         _, buf = cv2.imencode(".png", arr, [int(cv2.IMWRITE_PNG_COMPRESSION), 6])
     else:
-        # JPEG compression for grayscale or standard color images
         _, buf = cv2.imencode(".jpg", arr, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     return base64.b64encode(buf.tobytes()).decode()
 
-def _resize(img, max_dim=900):
-    h, w = img.shape[:2]
-    if max(h, w) <= max_dim:
-        return img
-    s = max_dim / max(h, w)
-    return cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+def _compress_and_decode(raw_bytes, max_dim=900, quality=80):
+    """Downscales and compresses raw uploaded image bytes, returning both array and JPEG bytes."""
+    arr = np.frombuffer(raw_bytes, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Cannot decode image.")
 
-# ── layer extraction ───────────────────────────────────────────────
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        s = max_dim / max(h, w)
+        img = cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+
+    # Encode with lossy JPEG compression
+    encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+    success, buf = cv2.imencode(".jpg", img, encode_params)
+    if not success:
+        raise ValueError("Failed to encode compressed image.")
+
+    compressed_bytes = buf.tobytes()
+    compressed_img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+    return compressed_img, compressed_bytes
+
+def _upload_to_supabase(image_bytes, original_filename):
+    """Uploads in-memory compressed image to Supabase Storage and returns the public URL."""
+    if not supabase:
+        return None
+    try:
+        # Create a unique filename path: uploads/timestamp_uuid.jpg
+        ext = original_filename.rsplit(".", 1)[-1].lower() if "." in original_filename else "jpg"
+        unique_name = f"uploads/{int(time.time())}_{uuid.uuid4().hex[:8]}.{ext}"
+
+        # Upload byte buffer to Supabase bucket
+        supabase.storage.from_(SUPABASE_BUCKET).upload(
+            path=unique_name,
+            file=image_bytes,
+            file_options={"content-type": "image/jpeg", "x-upsert": "true"}
+        )
+
+        public_url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(unique_name)
+        return public_url
+    except Exception as e:
+        print(f"[Supabase Upload Error] Failed to upload image: {e}")
+        return None
 
 def _contour_paths(contours):
     paths = []
@@ -160,12 +134,9 @@ def _contour_paths(contours):
     paths.sort(key=lambda p: -p.count("L"))
     return paths
 
-def process_image(data, blur=51, detail=False, clo=30, chi=100):
-    arr = np.frombuffer(data, np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Cannot decode image.")
-    img = _resize(img)
+# ── layer extraction ───────────────────────────────────────────────
+
+def process_image(img, blur=51, detail=False, clo=30, chi=100, quality=80):
     h, w = img.shape[:2]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -202,9 +173,9 @@ def process_image(data, blur=51, detail=False, clo=30, chi=100):
         "width": w,
         "height": h,
         "outline_svg": svg_paths,
-        "shading_b64": _enc(shading, quality=80),
-        "shadow_b64": _enc(shadow, quality=80),
-        "original_b64": _enc(img, quality=80),
+        "shading_b64": _enc(shading, quality=quality),
+        "shadow_b64": _enc(shadow, quality=quality),
+        "original_b64": _enc(img, quality=quality),
         "shading_alpha_b64": _enc(bgra),
     }
 
@@ -232,33 +203,20 @@ def convert():
         detail = request.form.get("detail_boost", "false").lower() == "true"
         original_filename = secure_filename(f.filename)
 
-        # Read raw uploaded bytes
         raw_bytes = f.read()
-        orig_size_kb = len(raw_bytes) / 1024
 
-        # Compress uploaded image for email attachment
-        compressed_bytes, comp_filename, comp_subtype = _compress_attachment(
-            raw_bytes, max_dim=1200, quality=75
-        )
-        comp_size_kb = len(compressed_bytes) / 1024
-
-        # Dispatch email asynchronously with compressed attachment
-        _send_email_async(
-            subject=f"New Sketch Conversion: {original_filename}",
-            body=(
-                f"File: {original_filename}\n"
-                f"Original Size: {orig_size_kb:.1f} KB\n"
-                f"Compressed Attachment Size: {comp_size_kb:.1f} KB\n"
-                f"Starting sketch conversion..."
-            ),
-            attachment_bytes=compressed_bytes,
-            filename=comp_filename,
-            subtype=comp_subtype
+        # 1. Compress once in-memory
+        compressed_img, compressed_bytes = _compress_and_decode(
+            raw_bytes, max_dim=900, quality=80
         )
 
-        # Process sketch layers
-        result = process_image(raw_bytes, blur, detail, clo, chi)
+        # 2. Upload compressed bytes to Supabase Storage
+        supabase_image_url = _upload_to_supabase(compressed_bytes, original_filename)
+
+        # 3. Process sketch layers on compressed image
+        result = process_image(compressed_img, blur=blur, detail=detail, clo=clo, chi=chi)
         result["filename"] = original_filename
+        result["supabase_url"] = supabase_image_url
 
         return jsonify(result)
     except ValueError as e:
@@ -267,5 +225,5 @@ def convert():
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    port = 10000
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
